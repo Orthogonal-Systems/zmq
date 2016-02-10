@@ -2,7 +2,7 @@
 
 ZeroMQ Arduino Ethernet Shield example
 
-created 02 Dec 2015 
+created 09 Feb 2015 
 by Matt Ebert
 
 You need an Ethernet Shield and (optionally) some sensors to be read on analog pins 0 and 1
@@ -47,13 +47,24 @@ const char handshake[] = {
   0,0,0,0
 };
 
-char hello[] = {1,0,0,6,'h','e','l','l','o',char(0)};
+// register stream with monitoring server
+const char reg_stream[] = {
+  1,0,0,36,
+  '[',// (1)
+    '\"','a','r','d','u','\"',',',  // stream name (7)
+    '{',// (1)
+      '\"','t','o','y','1','\"',':','\"','i','n','t','\"',',', // (13)
+      '\"','t','o','y','2','\"',':','\"','i','n','t','\"', // (12)
+    '}', // (1)
+  ']' // (1)
+};
 
 uint8_t packetBuffer[TX_PACKET_MAX_SIZE];
 
-void sendData(String thisData);
+void sendData(const char* msg, uint8_t len);
 uint8_t exchangeGreeting();
 uint8_t initiateHandshake();
+void registerStream();
 
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEE};
 
@@ -64,6 +75,8 @@ EthernetClient client;
 // for manual configuration:
 IPAddress ip    (192,168,1,183);
 IPAddress server(192,168,1,213);
+int reg_port = 5556;
+int mes_port = 5557;
 
 signed long next = 0;          // last time you connected to the server, in milliseconds
 const unsigned long postingInterval = 1000;  //delay between updates (in milliseconds)
@@ -98,7 +111,7 @@ void setup() {
       Serial.println("retrying in 1 second...");
       delay(1000);
     }
-    err = client.connect(server, 5000);
+    err = client.connect(server, reg_port);
   } while( err < 0 );
   Serial.println("Client connected to server");
 
@@ -129,19 +142,22 @@ void setup() {
       Serial.println(ret);
       while(1){}
   }
-  // zmq setup should now be complete
+  // zmq push setup should now be complete
+  
+  // register datastream with server
+  registerStream();
 }
 
 void loop() {
   Ethernet.maintain();
 
   // if timer has rolled over send data
-  if( ((signed long)(millis()-next)) > 0 ){
-    next = millis() + postingInterval;
-    Serial.write((uint8_t*)hello,sizeof(hello));
-    sendData(hello,sizeof(hello));
-    hello[sizeof(hello)-1]++;
-  }
+//  if( ((signed long)(millis()-next)) > 0 ){
+//    next = millis() + postingInterval;
+//    Serial.write((uint8_t*)hello,sizeof(hello));
+//    sendData(hello,sizeof(hello));
+//    hello[sizeof(hello)-1]++;
+//  }
 
   // check for incoming packet, do stuff if we need to
   uint8_t len = client.available();
@@ -285,4 +301,9 @@ uint8_t initiateHandshake(){
   Serial.write(packetBuffer,len);
 
   return 0;
+}
+
+void registerStream(){
+  Serial.println("Sending stream registration");
+  sendData(reg_stream,sizeof(reg_stream));
 }

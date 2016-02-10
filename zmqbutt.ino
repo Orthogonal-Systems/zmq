@@ -65,7 +65,7 @@ EthernetClient client;
 IPAddress ip    (192,168,1,183);
 IPAddress server(192,168,1,213);
 
-unsigned long lastPostTime = 0;          // last time you connected to the server, in milliseconds
+signed long next = 0;          // last time you connected to the server, in milliseconds
 const unsigned long postingInterval = 1000;  //delay between updates (in milliseconds)
 
 void setup() {
@@ -133,12 +133,30 @@ void setup() {
 }
 
 void loop() {
-  // check for incoming packet, do stuff if we need to
+  Ethernet.maintain();
+
   // if timer has rolled over send data
-  hello[sizeof(hello)-1]++;
-  Serial.write((uint8_t*)hello,sizeof(hello));
-  sendData(hello,sizeof(hello));
-  delay(1000);
+  if( ((signed long)(millis()-next)) > 0 ){
+    next = millis() + postingInterval;
+    Serial.write((uint8_t*)hello,sizeof(hello));
+    sendData(hello,sizeof(hello));
+    hello[sizeof(hello)-1]++;
+  }
+
+  // check for incoming packet, do stuff if we need to
+  uint8_t len = client.available();
+  if( len ){
+    // if len > buffer size ...
+    client.read(packetBuffer,len);
+    Serial.print("received packet of length: ");
+    Serial.println(len);
+    for(uint8_t i=0; i<len; i++){
+      Serial.print("0x");
+      Serial.print(packetBuffer[i],HEX);
+      Serial.print(", ");
+    }
+    Serial.println();
+  }
 }
 
 uint8_t waitForServer(uint16_t timeout){

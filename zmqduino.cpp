@@ -41,14 +41,8 @@
 
 const String fail = "Error: ";
 const String conn = "Connected";
-const String conn = "Handshook";
+const String handshake = "Handshook";
 
-enum zmq_soc { 
-  REQ, // Request
-  PUSH // Push
-};
-
-// this char array will hold all the ZMQ messages, so make it the maximum length
 char zmq_buffer[ZMQ_MAX_LENGTH] = {0};
 
 // zmq negotiate connection
@@ -85,7 +79,7 @@ uint8_t zmq_connect( EthernetClient& client, IPAddress host, uint16_t port, zmq_
 
   // send handshake
   ret = zmq_send_handshake(client, soc);
-  if( ret ){
+  if( ret < 0 ){
     Serial.print(fail);
     Serial.println(ret);
     return ret;
@@ -96,10 +90,11 @@ uint8_t zmq_connect( EthernetClient& client, IPAddress host, uint16_t port, zmq_
 
 int8_t zmq_greet( EthernetClient& client ){
   // send partial greeting
-  sendData( client, zmq_p_greeting );
+  uint8_t len = zmq_p_greeting();
+  zmq_sendData( client, len );
 
   // recieve partial greeting, into zmq_buffer
-  uint8_t len = zmq_receiveData( client, 1 );
+  len = zmq_receiveData( client, 1 );
   if( len < 0 ){
     return len;
   }
@@ -119,7 +114,8 @@ int8_t zmq_greet( EthernetClient& client ){
   }
 
   // send remaining greeting
-  sendData( client, zmq_r_greeting );
+  len = zmq_r_greeting();
+  zmq_sendData( client, len );
 
   // recieve remaining greeting
   len = zmq_receiveData( client, 1 );
@@ -132,7 +128,7 @@ int8_t zmq_greet( EthernetClient& client ){
     shitty_chksum += zmq_buffer[i+alternate_greeting];
   }
   // checking null mechanism
-  if( shitty_chksum != (uint16_t 'N')+(uint16_t 'U')+(uint16_t 'L')+(uint16_t 'L') ){
+  if( shitty_chksum != 'N'+'U'+'L'+'L' ){
     return 3;
   }
   // checking rest of null mechanism
@@ -147,13 +143,15 @@ int8_t zmq_greet( EthernetClient& client ){
 
 int8_t zmq_send_handshake( EthernetClient& client, zmq_soc soc ){
   // send handshake
-  sendData( client, zmq_handshake(soc) );
+  uint8_t len = zmq_handshake(soc);
+  zmq_sendData( client, len );
   // recieve handshake
-  uint8_t len = zmq_receiveData( client, 1 );
-  if( len < 0 ){
-    return len;
+  uint16_t resp_len = zmq_receiveData( client, 1 );
+  if( resp_len < 0 ){
+    return resp_len;
   }
   // TODO: verify parameters
+  return resp_len;
 }
 
 // send data to server (data is stored in zmq_buffer)
@@ -163,31 +161,33 @@ void zmq_sendData( EthernetClient& client, uint8_t len ){
   client.write((uint8_t*)zmq_buffer, len);
 }
 
-uint8_t zmq_receiveData( EthernetClient& client, uint8_t setup ){
-  if( waitForServer(ZMQ_RESP_TIMEOUT_MS) ){
+int16_t zmq_receiveData( EthernetClient& client, uint8_t setup ){
+  if( waitForServer(client, ZMQ_RESP_TIMEOUT_MS) ){
     Serial.println("timeout");
     return -1;
   }
   return zmq_readData( client, setup );
 }
-
-uint8_t zmq_readData( EthernetClient& client ){
+/*
+uint16_t zmq_readData( EthernetClient& client ){
   return zmq_readData( client, 0 );
 }
-
+*/
 // negative -> error
 // positive -> new bytes in zmq_buffer
 int16_t zmq_readData( EthernetClient& client, uint8_t setup ){
   uint8_t len = client.available();
+  Serial.print("\nRecv bytes: ");
+  Serial.println(len);
   if( setup ){
-    client.read(zmq_buffer, len);
+    client.read((uint8_t*)zmq_buffer, len);
     return len;
   }
   if( len < 4 ){
-    client.read(zmq_buffer, len);// clear buffer
+    client.read((uint8_t*)zmq_buffer, len);// clear buffer
     return -2;
   }
-  client.read(zmq_buffer, 4);
+  client.read((uint8_t*)zmq_buffer, 4);
   // check that it isnt a long message, if it is clear it?
   if( zmq_buffer[0] & (1<<ZMQ_LONG_FLAG) ){
     return -3;
@@ -198,7 +198,7 @@ int16_t zmq_readData( EthernetClient& client, uint8_t setup ){
   }
   // read the bytes sepecifed into the buffer
   len = zmq_buffer[3];
-  client.read(zmq_buffer, len);
+  client.read((uint8_t*)zmq_buffer, len);
   return len;
 }
 
@@ -209,7 +209,7 @@ void sendData( EthernetClient& client, const char* msg, uint8_t len ){
   client.write((uint8_t*)msg, len);
 }
 
-uint8_t waitForServer(uint16_t timeout){
+uint8_t waitForServer(EthernetClient& client, uint16_t timeout){
   // wait for response from server
   uint16_t i = 0;
   while( !client.available() ){
@@ -217,7 +217,7 @@ uint8_t waitForServer(uint16_t timeout){
       return 1;
     }
     i++;
-    delay(1);
+    delay(10);
   }
   return 0;
 }
@@ -233,7 +233,7 @@ uint8_t waitForServer(uint16_t timeout){
 uint8_t zmq_p_greeting(){
   zmq_buffer[0] = 0xff;
   // bits 1-8 are "dont care"
-  zmq_buffer[9] = 07f;
+  zmq_buffer[9] = 0x7f;
   zmq_buffer[10] = zmq_maj_ver;
   return ZMQ_PGREET_LEN;
 }
@@ -250,6 +250,39 @@ uint8_t zmq_r_greeting(){
   return len;
 }
 
+
+uint8_t zmq_handshake_REQ(){
+  uint8_t len = 40;
+  zmq_buffer[23] = 3; // 4 byte property value length
+  zmq_buffer[24] = 'R';
+  zmq_buffer[25] = 'E';
+  zmq_buffer[26] = 'Q';
+  // property
+  zmq_buffer[27] = 8;
+  zmq_buffer[28] = 'I';
+  zmq_buffer[29] = 'd';
+  zmq_buffer[30] = 'e';
+  zmq_buffer[31] = 'n';
+  zmq_buffer[32] = 't';
+  zmq_buffer[33] = 'i';
+  zmq_buffer[34] = 't';
+  zmq_buffer[35] = 'y';
+  for(uint8_t i=0; i<4; i++){
+    zmq_buffer[len-i] = 0;
+  }
+  return len;
+}
+
+uint8_t zmq_handshake_PUSH(){
+  uint8_t len = ZMQ_HS_PUSH_LEN;
+  zmq_buffer[23] = 4; // 4 byte property value length
+  zmq_buffer[24] = 'P';
+  zmq_buffer[25] = 'U';
+  zmq_buffer[26] = 'S';
+  zmq_buffer[27] = 'H';
+  return len;
+}
+
 // handshakes
 uint8_t zmq_handshake( zmq_soc soc ){
   uint8_t len = 0;
@@ -257,7 +290,7 @@ uint8_t zmq_handshake( zmq_soc soc ){
     case REQ: 
       len = zmq_handshake_REQ();
       break;
-    case PULL:
+    case PUSH:
       len = zmq_handshake_PUSH();
       break;
     default:
@@ -289,36 +322,4 @@ uint8_t zmq_handshake( zmq_soc soc ){
   zmq_buffer[21] = 0;
   zmq_buffer[22] = 0;
   return len; // 0 len message
-}
-
-uint8_t handshake_REQ(){
-  uint8_t len = 40;
-  zmq_buffer[23] = 3; // 4 byte property value length
-  zmq_buffer[24] = 'R';
-  zmq_buffer[25] = 'E';
-  zmq_buffer[26] = 'Q';
-  // property
-  zmq_buffer[27] = 8;
-  zmq_buffer[28] = 'I';
-  zmq_buffer[29] = 'd';
-  zmq_buffer[30] = 'e';
-  zmq_buffer[31] = 'n';
-  zmq_buffer[32] = 't';
-  zmq_buffer[33] = 'i';
-  zmq_buffer[34] = 't';
-  zmq_buffer[35] = 'y';
-  for(uint8_t i=0; i<4; i++){
-    zmq_buffer[len-i] = 0;
-  }
-  return len;
-}
-
-uint8_t handshake_PUSH(){
-  uint8_t len = ZMQ_HS_PUSH_LEN;
-  zmq_buffer[23] = 4; // 4 byte property value length
-  zmq_buffer[24] = 'P';
-  zmq_buffer[25] = 'U';
-  zmq_buffer[26] = 'S';
-  zmq_buffer[27] = 'H';
-  return len;
 }

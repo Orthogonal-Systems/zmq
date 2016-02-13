@@ -1,4 +1,4 @@
-x/*
+/*
 
 ZeroMQ Arduino Ethernet Shield example
 
@@ -25,9 +25,9 @@ the uIP tcp stack by Adam Dunkels.
 const char reg_stream[] = {
   1,0,0,21,
   '[',// (1)
-    '\"','i','n','o','5','\"',',',  // stream name (7)
+    '"','i','n','o','5','"',',',  // stream name (7)
     '{',// (1)
-      '\"','t','2','\"',':','\"','i','n','t','\"', //(10)
+      '"','t','2','"',':','"','i','n','t','"', //(10)
     '}', // (1)
   ']' // (1)
 };
@@ -35,15 +35,15 @@ const char reg_stream[] = {
 char data[] = {
   1,0,0,20, // 4bytes + ',' + 4bytes
   '[',//(1)
-    '\"','i','n','o','5','\"',',',//(7)
+    '"','i','n','o','5','"',',',//(7)
     '1',',',//(1)
     '{',//(1)
-      '\"','t','2','\"',':','1','0','0','4',//(6)
+      '"','t','2','"',':','1','0','0','4',//(6)
     '}',// (1)
   ']'//(1)
 };
 
-void registerStream();
+uint8_t registerStream();
 
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEE};
 
@@ -53,7 +53,8 @@ EthernetClient client;
 // fill in an available IP address on your network here,
 // for manual configuration:
 IPAddress ip    (192,168,1,183);
-IPAddress server(192,168,1,213);
+//IPAddress server(192,168,1,213);
+IPAddress server(128,104,160,150);
 int reg_port = 5556;
 int mes_port = 5557;
 
@@ -87,21 +88,25 @@ void setup() {
       ;
   }
   // register datastream with server
-  if( registerStream(client) ){
+  Serial.println("registering...");
+  if( registerStream() ){
     for(;;)
       ;
   }
   // disconnect from registering port
+  Serial.println("disconnecting...");
   client.stop();
   
   delay(1000);
   
   // setup push socket
+  Serial.println("set up PUSH...");
   if( zmq_connect( client, server, mes_port, PUSH) ){
     client.stop();
     for(;;)
       ;
   }
+  Serial.println("Starting data...");
 
   // data is fixed length right now
   data[3] = sizeof(data)-4;
@@ -133,7 +138,7 @@ void loop() {
     count++;
     
     Serial.write((uint8_t*)data,sizeof(data));
-    sendData(data,sizeof(data));
+    sendData(client,data,sizeof(data));
 //    const char test[] = { 1,0,0,4,'t','e','s','t'};
 //    Serial.write((uint8_t*)test,sizeof(test));
 //    sendData(test,sizeof(test));
@@ -142,17 +147,19 @@ void loop() {
   // check for incoming packet, do stuff if we need to
   uint8_t len = client.available();
   if( len ){
-    len = zmq_readData( client ); // process header and get get actual mesg length
-    for(uint8_t i=0; i<len; i++){
-      Serial.print("0x");
-      Serial.print(zmq_buffer[i],HEX);
-      Serial.print(", ");
-    }
-    Serial.println();
+    len = zmq_readData( client, 0 ); // process header and get get actual mesg length
+    //for(uint8_t i=0; i<len; i++){
+      //Serial.print("0x");
+      //Serial.print(zmq_buffer[i],HEX);
+      //Serial.print(", ");
+    //}
+    //Serial.println();
   }
 }
 
-void registerStream(){
+uint8_t registerStream(){
   //Serial.println("Sending stream registration");
-  sendData(reg_stream,sizeof(reg_stream));
+  // TODO: check response from server
+  sendData(client,reg_stream,sizeof(reg_stream));
+  return 0;
 }

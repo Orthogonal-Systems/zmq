@@ -42,7 +42,7 @@ enum zmq_soc {
 };
 
 // this char array will hold all the ZMQ messages, so make it the maximum length
-char zmq_buffer[ZMQ_MAX_LENGTH] = {0};
+//char zmq_buffer[ZMQ_MAX_LENGTH] = {0};
 
 // zmq negotiate connection
 uint8_t zmq_connect( EthernetClient& client, IPAddress host, uint16_t port, zmq_soc soc );
@@ -56,15 +56,22 @@ int8_t zmq_send_handshake( EthernetClient& client, zmq_soc soc );
 // send data to server (data is stored in zmq_buffer)
 void zmq_sendData( EthernetClient& client, uint8_t len );
 
-uint8_t zmq_receiveData( EthernetClient& client, uint8_t setup );
+int16_t zmq_receiveData( EthernetClient& client, uint8_t setup );
 
 // negative -> error
 // positive -> new bytes in zmq_buffer
+//int16_t zmq_readData( EthernetClient& client );
 int16_t zmq_readData( EthernetClient& client, uint8_t setup );
 
 // send data to server
 void sendData( EthernetClient& client, const char* msg, uint8_t len );
 
-uint8_t waitForServer(uint16_t timeout);
+uint8_t waitForServer(EthernetClient& client, uint16_t timeout);
+
+uint8_t zmq_p_greeting();
+uint8_t zmq_r_greeting();
+uint8_t zmq_handshake( zmq_soc soc );
+uint8_t zmq_handshake_REQ();
+uint8_t zmq_handshake_PUSH();
 
 #endif

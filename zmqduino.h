@@ -31,47 +31,59 @@
 
 #define ZMQ_MAX_LENGTH 64 // greeting is 64 bytes
 
-#define ZMQ_RESP_TIMEOUT_MS 1000 
+#define ZMQ_RESP_TIMEOUT_MS 10000 
 
-const uint8_t zmq_maj_ver = 3;
-const uint8_t zmq_min_ver = 0;
-
-enum zmq_soc { 
+enum ZMQSocketType { 
   REQ, // Request
   PUSH // Push
 };
 
-// this char array will hold all the ZMQ messages, so make it the maximum length
-//char zmq_buffer[ZMQ_MAX_LENGTH] = {0};
+class ZMQSocket {
+  public:
+    ZMQSocket( EthernetClient& _client, char* _buf, ZMQSocketType _socketType)
+      : client(_client)
+      , buffer(_buf)
+      , socketType(_socketType)
+    {}
 
-// zmq negotiate connection
-uint8_t zmq_connect( EthernetClient& client, IPAddress host, uint16_t port, zmq_soc soc );
+    // zmq negotiate connection
+    int8_t connect( IPAddress host, uint16_t port );
 
-// perform greeting ritual
-int8_t zmq_greet( EthernetClient& client );
+    // send data to server (data is stored in zmq_buffer)
+    void send( uint8_t len );
 
-// perform handshake ritual
-int8_t zmq_send_handshake( EthernetClient& client, zmq_soc soc );
+    // send data to server
+    void send( const char* msg, uint8_t len );
+    
+    int16_t read();
+    int16_t recv();
 
-// send data to server (data is stored in zmq_buffer)
-void zmq_sendData( EthernetClient& client, uint8_t len );
+    uint8_t waitForServer();
 
-int16_t zmq_receiveData( EthernetClient& client, uint8_t setup );
+  private:
+    static const uint8_t majVer = 3;
+    static const uint8_t minVer = 0;
+    EthernetClient client;  //!< Arduino client class
+    char* const buffer;           //!< ZMQ communication buffer
+    const ZMQSocketType socketType;
+    const uint16_t timeout = ZMQ_RESP_TIMEOUT_MS;
 
-// negative -> error
-// positive -> new bytes in zmq_buffer
-//int16_t zmq_readData( EthernetClient& client );
-int16_t zmq_readData( EthernetClient& client, uint8_t setup );
+    // perform greeting ritual
+    int8_t greet();
+    // perform handshake ritual
+    int8_t sendHandshake();
 
-// send data to server
-void sendData( EthernetClient& client, const char* msg, uint8_t len );
+    // negative -> error
+    // positive -> new bytes in zmq_buffer
+    //int16_t zmq_readData( EthernetClient& client );
+    int16_t recv( uint8_t setup );
 
-uint8_t waitForServer(EthernetClient& client, uint16_t timeout);
-
-uint8_t zmq_p_greeting();
-uint8_t zmq_r_greeting();
-uint8_t zmq_handshake( zmq_soc soc );
-uint8_t zmq_handshake_REQ();
-uint8_t zmq_handshake_PUSH();
+    int16_t read( uint8_t setup );
+    uint8_t p_greeting();
+    uint8_t r_greeting();
+    uint8_t handshake();
+    uint8_t handshake_REQ();
+    uint8_t handshake_PUSH();
+};
 
 #endif

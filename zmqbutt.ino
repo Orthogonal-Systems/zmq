@@ -18,9 +18,11 @@ the uIP tcp stack by Adam Dunkels.
 
 #include <SPI.h>
 #include <UIPEthernet.h>
-//#include <UIPServer.h>
 #include <UIPClient.h>
 #include "zmqduino.h"
+
+
+char zmq_buffer[ZMQ_MAX_LENGTH] = {0}; //!< buffer for zmq communication
 
 const char reg_stream[] = {
   1,0,0,21,
@@ -49,6 +51,7 @@ byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEE};
 
 // initialize the library instance:
 EthernetClient client;
+ZMQSocket ZMQPush(client, zmq_buffer, PUSH);
 
 // fill in an available IP address on your network here,
 // for manual configuration:
@@ -64,10 +67,9 @@ const unsigned long postingInterval = 1000;  //delay between updates (in millise
 uint8_t count = 0;
 
 void setup() {
-  Serial.begin(9600); //Turn on Serial Port
-    //Ethernet.begin(mac, ip); //Initialize Ethernet
+  Serial.begin(115200); //Turn on Serial Port
     
-  delay(1000);
+  delay(100);
   Serial.println("Attempting DHCP...");
   if (Ethernet.begin(mac) == 0) {
     Serial.println("Failed DHCP");
@@ -75,15 +77,15 @@ void setup() {
     for(;;)
       ;
   }
-
   Serial.println(Ethernet.localIP());
   Serial.println(Ethernet.subnetMask());
   Serial.println(Ethernet.gatewayIP());
   Serial.println(Ethernet.dnsServerIP());
 
   // setup request socket
-  if( zmq_connect( client, server, reg_port, REQ) ){
-    client.stop();
+  ZMQSocket ZMQReq( client, zmq_buffer, REQ );
+  if( ZMQReq.connect( server, reg_port ) ){
+    client.stop(); // TODO: deal with this better
     for(;;)
       ;
   }
@@ -97,12 +99,12 @@ void setup() {
   Serial.println("disconnecting...");
   client.stop();
   
-  delay(1000);
+  delay(1000); // increase stability
   
   // setup push socket
   Serial.println("set up PUSH...");
-  if( zmq_connect( client, server, mes_port, PUSH) ){
-    client.stop();
+  if( ZMQPush.connect( server, mes_port ) ){
+    client.stop(); // TODO: deal with this better
     for(;;)
       ;
   }
@@ -110,7 +112,7 @@ void setup() {
 
   // data is fixed length right now
   data[3] = sizeof(data)-4;
-  delay(5000);
+  delay(3000);
 }
 
 void loop() {
@@ -138,16 +140,13 @@ void loop() {
     count++;
     
     Serial.write((uint8_t*)data,sizeof(data));
-    sendData(client,data,sizeof(data));
-//    const char test[] = { 1,0,0,4,'t','e','s','t'};
-//    Serial.write((uint8_t*)test,sizeof(test));
-//    sendData(test,sizeof(test));
+    ZMQPush.send(data,sizeof(data));
   }
 
   // check for incoming packet, do stuff if we need to
   uint8_t len = client.available();
   if( len ){
-    len = zmq_readData( client, 0 ); // process header and get get actual mesg length
+    len = ZMQPush.read(); // process header and get get actual mesg length
     //for(uint8_t i=0; i<len; i++){
       //Serial.print("0x");
       //Serial.print(zmq_buffer[i],HEX);
@@ -160,6 +159,6 @@ void loop() {
 uint8_t registerStream(){
   //Serial.println("Sending stream registration");
   // TODO: check response from server
-  sendData(client,reg_stream,sizeof(reg_stream));
+  ZMQPush.send(reg_stream,sizeof(reg_stream));
   return 0;
 }

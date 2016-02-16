@@ -16,11 +16,13 @@ the uIP tcp stack by Adam Dunkels.
 
  */
 
-#include <SPI.h>
+#include <Arduino.h>
+//#include <SPI.h>
 #include <UIPEthernet.h>
 #include <UIPClient.h>
-#include "zmqduino.h"
-#include "monitoringServer.h"
+
+#include "zmqduino.h"   // zmq interface
+#include "monitoringServer.h" // monitoringServer interface
 
 uint8_t channels = 2;
 
@@ -130,4 +132,17 @@ void loop() {
     //Serial.println();
   }
   counts[0]++;
+}
+
+// normal arduino main function
+int main(void){
+  init();
+
+  setup();
+
+  for(;;){
+    loop();
+    if (serialEventRun) serialEventRun();
+  }
+  return 0;
 }

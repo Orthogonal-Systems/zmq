@@ -20,38 +20,18 @@ the uIP tcp stack by Adam Dunkels.
 #include <UIPEthernet.h>
 #include <UIPClient.h>
 #include "zmqduino.h"
+#include "monitoringServer.h"
 
+uint8_t channels = 2;
 
 char zmq_buffer[ZMQ_MAX_LENGTH] = {0}; //!< buffer for zmq communication
-
-const char reg_stream[] = {
-  1,0,0,21,
-  '[',// (1)
-    '"','i','n','o','5','"',',',  // stream name (7)
-    '{',// (1)
-      '"','t','2','"',':','"','i','n','t','"', //(10)
-    '}', // (1)
-  ']' // (1)
-};
-
-char data[] = {
-  1,0,0,20, // 4bytes + ',' + 4bytes
-  '[',//(1)
-    '"','i','n','o','5','"',',',//(7)
-    '1',',',//(1)
-    '{',//(1)
-      '"','t','2','"',':','1','0','0','4',//(6)
-    '}',// (1)
-  ']'//(1)
-};
-
-uint8_t registerStream();
 
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEE};
 
 // initialize the library instance:
 EthernetClient client;
 ZMQSocket ZMQPush(client, zmq_buffer, PUSH);
+DataPacket packet( channels, "testy", 5, 5, zmq_buffer + ZMQ_MSG_OFFSET );
 
 // fill in an available IP address on your network here,
 // for manual configuration:
@@ -64,16 +44,16 @@ int mes_port = 5557;
 signed long next = 0;          // last time you connected to the server, in milliseconds
 const unsigned long postingInterval = 1000;  //delay between updates (in milliseconds)
 
-uint8_t count = 0;
+int16_t counts[2] = {0};
 
 void setup() {
   Serial.begin(115200); //Turn on Serial Port
     
+  // set up ethernet chip
   delay(100);
   Serial.println("Attempting DHCP...");
   if (Ethernet.begin(mac) == 0) {
     Serial.println("Failed DHCP");
-    // no point in carrying on, so do nothing forevermore:
     for(;;)
       ;
   }
@@ -91,7 +71,18 @@ void setup() {
   }
   // register datastream with server
   Serial.println("registering...");
-  if( registerStream() ){
+  uint8_t len = packet.registerStream();
+  ZMQReq.sendZMQMsg(len);
+  len = ZMQReq.recv();
+  if( len < 0 ){
+    client.stop();
+    for(;;)
+      ;
+  }
+  // check that we got the expected response from the moitoring server
+  if( len != 6 ){
+    Serial.println("wrong registration response len: ");
+    Serial.print(len);
     for(;;)
       ;
   }
@@ -109,9 +100,6 @@ void setup() {
       ;
   }
   Serial.println("Starting data...");
-
-  // data is fixed length right now
-  data[3] = sizeof(data)-4;
   delay(3000);
 }
 
@@ -120,27 +108,14 @@ void loop() {
 
   // if timer has rolled over send data
   if( ((signed long)(millis()-next)) > 0 ){
-    next = millis() + postingInterval;
-    
-//    uint32_t ms = millis();
-//    uint32_t us = micros();
-//    for( uint8_t i=0; i<4; i++){
-//      data[15-i] = (char)ms;
-//      data[28-i] = (char)ms;
-//      ms = ms >> 4;
-//      data[40-i] = (char)us;
-//      us = us >> 4;
-//    }
+    uint32_t ts = millis();
+    next = ts + postingInterval;
 
-    uint8_t temp = count;
-    for( uint8_t i=0; i<3; i++ ){
-      data[23-i] = char(((uint8_t)'0') + (temp%10));
-      temp /= 10;
-    }
-    count++;
-    
-    Serial.write((uint8_t*)data,sizeof(data));
-    ZMQPush.send(data,sizeof(data));
+    uint8_t len = packet.preparePacket( ts, counts );
+    Serial.write((uint8_t*)(zmq_buffer+ZMQ_MSG_OFFSET),len);
+    Serial.println();
+    ZMQPush.sendZMQMsg(len);
+    counts[1]++;
   }
 
   // check for incoming packet, do stuff if we need to
@@ -154,11 +129,5 @@ void loop() {
     //}
     //Serial.println();
   }
-}
-
-uint8_t registerStream(){
-  //Serial.println("Sending stream registration");
-  // TODO: check response from server
-  ZMQPush.send(reg_stream,sizeof(reg_stream));
-  return 0;
+  counts[0]++;
 }

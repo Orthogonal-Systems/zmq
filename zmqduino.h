@@ -30,6 +30,7 @@
 #include "UIPClient.h"
 
 #define ZMQ_MAX_LENGTH 64 // greeting is 64 bytes
+#define ZMQ_MSG_OFFSET 4  // 4 byte header for ZMQ messages
 
 #define ZMQ_RESP_TIMEOUT_MS 10000 
 
@@ -49,11 +50,14 @@ class ZMQSocket {
     // zmq negotiate connection
     int8_t connect( IPAddress host, uint16_t port );
 
-    // send data to server (data is stored in zmq_buffer)
+    // send data to server (msg is already formatted and stored in zmq_buffer)
     void send( uint8_t len );
 
-    // send data to server
+    // send data to server, no formatting done
     void send( const char* msg, uint8_t len );
+
+    // format header and send a ZMQ message that is already stored in the buffer
+    void sendZMQMsg( uint8_t msgLen );
     
     int16_t read();
     int16_t recv();

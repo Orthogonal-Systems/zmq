@@ -182,6 +182,15 @@ int16_t ZMQSocket::recv(){
   return recv(0);
 }
 
+//  prepend message with ZMQ header then send it along
+void ZMQSocket::sendZMQMsg( uint8_t msgLen ){
+  buffer[0] = 1;
+  buffer[1] = 0;
+  buffer[2] = 0;
+  buffer[3] = msgLen;
+  send( msgLen + 4 );
+}
+
 int16_t ZMQSocket::recv( uint8_t setup ){
   if( waitForServer() ){
 #ifdef DEBUG

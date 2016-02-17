@@ -87,6 +87,9 @@ int8_t ZMQSocket::connect( IPAddress host, uint16_t port ){
         client.stop();
         delay(1000);
       }
+    } else {
+      Serial.println(F("error code: "));
+      Serial.println(err);
     }
   } while(!success);
 

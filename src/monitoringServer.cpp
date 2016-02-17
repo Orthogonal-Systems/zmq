@@ -26,13 +26,21 @@ uint8_t DataPacket::registerStream(){
 // ready the data packet in the buffer
 // returns length of packet in bytes
 uint8_t DataPacket::preparePacket( uint32_t timestamp, int16_t* data ){
+  Serial.println(F("serious"));
   uint8_t os = addPreString();
+  Serial.println(F("1"));
   int2charArray(timestamp, buffer+os);
+  Serial.println(F("2"));
   buffer[os+TIMESTAMP_SIZE] = ',';
+  Serial.println(F("3"));
   buffer[os+TIMESTAMP_SIZE+1] = '{';
+  Serial.println(F("4"));
   for( uint8_t i=0; i<channels; i++ ){
+    Serial.print("c");
+    Serial.println(i);
     addChannelData( i, data[i], buffer+os+TIMESTAMP_SIZE+2+i*(4+CHANNEL_NAME_SIZE+dataEntrySize) );
   }
+  Serial.println(F("5"));
   buffer[packetSize-2] = '}';
   buffer[packetSize-1] = ']';
   return packetSize;
@@ -42,7 +50,7 @@ uint8_t DataPacket::preparePacket( uint32_t timestamp, int16_t* data ){
 // pass pointer to the location in the buffer where data starts and fill it
 // TODO: handle negatives
 void DataPacket::int2charArray(int16_t x, char* buf){
-  for(uint8_t i=dataEntrySize; i>0; i++){
+  for(uint8_t i=dataEntrySize; i>0; i--){
     if( x == 0 ){
       buf[i-1] = ' ';
     } else {
@@ -52,7 +60,11 @@ void DataPacket::int2charArray(int16_t x, char* buf){
   }
 }
 void DataPacket::int2charArray(uint32_t x, char* buf){
-  for(uint8_t i=TIMESTAMP_SIZE; i>0; i++){
+  Serial.println(F("1."));
+  for(uint8_t i=TIMESTAMP_SIZE; i>0; i--){
+    Serial.print(F("1."));
+    Serial.println(i);
+    Serial.println(x);
     if( x == 0 ){
       buf[i-1] = ' ';
     } else {

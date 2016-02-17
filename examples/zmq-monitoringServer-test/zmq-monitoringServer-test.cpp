@@ -59,15 +59,17 @@ void setup() {
     
   // set up ethernet chip
   delay(1000);
-  Serial.println(F("DHCP..."));
   byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEE};
+  /*
+  Serial.println(F("DHCP..."));
   if (Ethernet.begin(mac) == 0) {
     Serial.println(F("Faled DHCP"));
     for(;;)
       ;
   }
-//  Serial.println(F("STATIC..."));
-//  Ethernet.begin(mac,ip);// cant use DHCP without using UDP
+  */
+  Serial.println(F("STATIC..."));
+  Ethernet.begin(mac,ip);// cant use DHCP without using UDP
   Serial.println(Ethernet.localIP());
   //Serial.println(Ethernet.subnetMask());
   //Serial.println(Ethernet.gatewayIP());
@@ -119,11 +121,13 @@ void setup() {
     for(;;)
       ;
   }
-  Serial.println(F("Starting data stream"));
+  Serial.println(F("Starting"));
   delay(3000);
+  Serial.println(F("Data"));
 }
 
 void loop() {
+  Serial.println(F("Stream"));
   Ethernet.maintain();
 
   // if timer has rolled over send data
@@ -131,7 +135,10 @@ void loop() {
     uint32_t ts = millis();
     next = ts + postingInterval;
 
+    Serial.println(F("For"));
+
     uint8_t len = packet.preparePacket( ts, counts );
+    Serial.println(F("Reals"));
     Serial.write((uint8_t*)(zmq_buffer+ZMQ_MSG_OFFSET),len);
     Serial.println();
     ZMQPush.sendZMQMsg(len);

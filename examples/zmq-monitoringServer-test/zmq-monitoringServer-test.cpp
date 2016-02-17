@@ -25,7 +25,7 @@ the uIP tcp stack by Adam Dunkels.
 
 uint8_t channels = 2;
 
-char zmq_buffer[64]={0}; //!< buffer for zmq communication
+char zmq_buffer[90]={0}; //!< buffer for zmq communication
 
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEE};
 
@@ -86,7 +86,7 @@ void setup() {
       err = 1;
     }
     if(!err){
-      Ethernet.maintain();
+      //Ethernet.maintain();
       // register datastream with server
       Serial.println(F("Registering data stream..."));
       len = packet.registerStream();
@@ -114,6 +114,7 @@ void setup() {
   // setup push socket
   Serial.println(F("Setting up PUSH socket..."));
   if( ZMQPush.connect( server, mes_port ) ){
+    Serial.println(F("shit"));
     client.stop(); // TODO: deal with this better
     for(;;)
       ;

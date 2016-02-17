@@ -71,6 +71,7 @@ class ZMQSocket {
     char* const buffer;           //!< ZMQ communication buffer
     const ZMQSocketType socketType;
     const uint16_t timeout = ZMQ_RESP_TIMEOUT_MS;
+    uint8_t doubleMsg = 0;
 
     // perform greeting ritual
     int8_t greet();

@@ -27,12 +27,10 @@
 
 #ifdef DEBUG
 #include "Arduino.h"
-//const String fail = "Error: ";
-//const String conn = "Connected";
-//const String handshakestr = "Handshook";
+const String fail = "Error: ";
+const String conn = "Connected";
+const String handshakestr = "Handshook";
 #endif
-
-#include <avr/pgmspace.h>
 #include "UIPEthernet.h"
 #include "UIPClient.h"
 #include "zmqduino.h"
@@ -48,35 +46,38 @@
 #define ZMQ_LONG_FLAG 1
 #define ZMQ_MORE_FLAG 0
 
-const char PUSHHandshake[] PROGMEM = {"\x04\x1C\x05READY\x0BSocket-Type\x00\x00\x00\04PUSH"};
-const char REQHandshake[] PROGMEM = {"\x04\x28\x05READY\x0BSocket-Type\x00\x00\x00\03REQ\x08Identity\x00\x00\x00\x00"};
+
+// I want this to be public
+//char zmq_buffer[ZMQ_MAX_LENGTH] = {0};
 
 // zmq negotiate connection
 int8_t ZMQSocket::connect( IPAddress host, uint16_t port ){
   int8_t err = 1;
-  uint8_t success=0;
-  uint8_t ret=0;
+  uint8_t success = 0;  
+  uint8_t ret = 0;  
   do {
     if( err < 0 ){
 #ifdef DEBUG
-      Serial.print(F("Failed"));
+      Serial.print(fail);
       Serial.println(err);
 #endif
       delay(1000);
     }
 
+    Serial.println(F("preconnect"));
     err = client.connect(host, port);
+    Serial.println(F("postconnect"));
     // client. connect returns negative error number, success is 1
     if( err > 0 ){
 #ifdef DEBUG
-      Serial.println(F("Connnected"));
+      Serial.println(conn);
 #endif
   
       // send greeting to server, and check stuff
       ret = greet();
       if( ret ){
 #ifdef DEBUG
-        Serial.print(F("Failed"));
+        Serial.print(fail);
         Serial.println(ret);
 #endif
       } else {
@@ -93,13 +94,13 @@ int8_t ZMQSocket::connect( IPAddress host, uint16_t port ){
   ret = sendHandshake();
   if( ret < 0 ){
 #ifdef DEBUG
-    Serial.print(F("Failed"));
+    Serial.print(fail);
     Serial.println(ret);
 #endif
     return ret;
   }
 #ifdef DEBUG
-  Serial.println(F("handshook"));
+  Serial.println(handshakestr);
 #endif
   return 0;
 }
@@ -134,12 +135,24 @@ int8_t ZMQSocket::greet(){
   send( len );
 
   // recieve remaining greeting
+  if( waitForServer() ){
+#ifdef DEBUG
+    Serial.println("timeout");
+#endif
+    return -1;
+  }
   len = recv( 1 );
   if( len < 0 ){
     return len;
   }
+  doubleMsg = 0;
+  uint8_t expectedLen = ZMQ_RGREET_LEN + alternate_greeting;
+  if( len > expectedLen ){
+    doubleMsg = len-expectedLen;
+  }
+  client.read((uint8_t*)buffer, expectedLen);
 
-  uint16_t shitty_chksum=0;
+  uint16_t shitty_chksum = 0;
   for( uint8_t i=1; i<5; i++ ){
     shitty_chksum += buffer[i+alternate_greeting];
   }
@@ -153,6 +166,10 @@ int8_t ZMQSocket::greet(){
       return 3;
     }
   }
+  if( doubleMsg ){
+    //shift the message to offset 0
+    memcpy(buffer, buffer+expectedLen, doubleMsg);
+  }
   // we good
   return 0;
 }
@@ -162,9 +179,14 @@ int8_t ZMQSocket::sendHandshake(){
   uint8_t len = handshake();
   send( len );
   // recieve handshake
-  uint16_t resp_len = recv( 1 );
-  if( resp_len < 0 ){
-    return resp_len;
+  int16_t resp_len;
+  if( doubleMsg ){
+    return doubleMsg;
+  } else {
+    resp_len = recv( 2 );
+    if( resp_len < 0 ){
+      return resp_len;
+    }
   }
   // TODO: verify parameters
   return resp_len;
@@ -175,13 +197,6 @@ void ZMQSocket::send( uint8_t len ){
 #ifdef DEBUG
   Serial.print("\nSending bytes: ");
   Serial.println(len);
-  for(uint8_t i=0; i<len; i++){
-    Serial.print(buffer[i],HEX);
-    Serial.print(",");
-  }
-  Serial.println();
-  Serial.write(buffer,len);
-  Serial.println();
 #endif
   client.write((uint8_t*)buffer, len);
 }
@@ -197,21 +212,12 @@ void ZMQSocket::sendZMQMsg( uint8_t msgLen ){
   buffer[2] = 0;
   buffer[3] = msgLen;
   send( msgLen + 4 );
-#ifdef DEBUG
-  Serial.write(buffer+4,msgLen);
-  Serial.println();
-  for(uint8_t i=0; i<msgLen+4; i++){
-    Serial.print(buffer[i],HEX);
-    Serial.print(",");
-  }
-  Serial.println();
-#endif
 }
 
 int16_t ZMQSocket::recv( uint8_t setup ){
   if( waitForServer() ){
 #ifdef DEBUG
-    Serial.println(F("timeout"));
+    Serial.println("timeout");
 #endif
     return -1;
   }
@@ -230,13 +236,19 @@ int16_t ZMQSocket::read( uint8_t setup ){
   Serial.print("\nRecv bytes: ");
   Serial.println(len);
 #endif
-  if( setup ){
-    // TODO: read the len from a setup thing
+  if( setup==1 ){
     client.read((uint8_t*)buffer, len);
-#ifdef DEBUG
-    Serial.write(buffer,len);
-    Serial.println();
-#endif
+    return len;
+  }
+  if( setup==2 ){
+    // TODO: read the len from a setup thing
+    Serial.println(F("Setup header: "));
+    client.read((uint8_t*)buffer, 1);
+    Serial.println(buffer[0],HEX);
+    client.read((uint8_t*)buffer, 1);
+    Serial.println(buffer[0],HEX);
+    len = buffer[0];
+    client.read((uint8_t*)buffer, len);
     return len;
   }
   if( len < 4 ){
@@ -269,13 +281,13 @@ void ZMQSocket::send( const char* msg, uint8_t len ){
 
 uint8_t ZMQSocket::waitForServer(){
   // wait for response from server
-  uint16_t i=0;
+  uint16_t i = 0;
   while( !client.available() ){
     if( i > ZMQ_RESP_TIMEOUT_MS ){
       return 1;
     }
     i++;
-    delay(1);
+    delay(10);
   }
   return 0;
 }
@@ -291,9 +303,6 @@ uint8_t ZMQSocket::waitForServer(){
 uint8_t ZMQSocket::p_greeting(){
   buffer[0] = 0xff;
   // bits 1-8 are "dont care"
-  for( uint8_t i=0; i<8; i++){
-    buffer[i+1] = 0;
-  }
   buffer[9] = 0x7f;
   buffer[10] = majVer;
   return ZMQ_PGREET_LEN;
@@ -313,18 +322,34 @@ uint8_t ZMQSocket::r_greeting(){
 
 
 uint8_t ZMQSocket::handshake_REQ(){
-  uint8_t len = ZMQ_HS_REQ_LEN;
-  for (uint8_t k = 0; k < len; k++){
-    buffer[k] = pgm_read_byte_near(REQHandshake + k);
+  uint8_t len = 40;
+  buffer[23] = 3; // 4 byte property value length
+  buffer[24] = 'R';
+  buffer[25] = 'E';
+  buffer[26] = 'Q';
+  // property
+  buffer[27] = 8;
+  buffer[28] = 'I';
+  buffer[29] = 'd';
+  buffer[30] = 'e';
+  buffer[31] = 'n';
+  buffer[32] = 't';
+  buffer[33] = 'i';
+  buffer[34] = 't';
+  buffer[35] = 'y';
+  for(uint8_t i=0; i<4; i++){
+    buffer[len-i] = 0;
   }
   return len;
 }
 
 uint8_t ZMQSocket::handshake_PUSH(){
   uint8_t len = ZMQ_HS_PUSH_LEN;
-  for (uint8_t k = 0; k < len; k++){
-    buffer[k] = pgm_read_byte_near(PUSHHandshake + k);
-  }
+  buffer[23] = 4; // 4 byte property value length
+  buffer[24] = 'P';
+  buffer[25] = 'U';
+  buffer[26] = 'S';
+  buffer[27] = 'H';
   return len;
 }
 
@@ -341,5 +366,30 @@ uint8_t ZMQSocket::handshake(){
     default:
       return len;
   }
+  buffer[0] = 1<<ZMQ_CMD_FLAG; // command flag
+  buffer[1] = len - 2;  // message length minus header
+  // command
+  buffer[2] = 5;  // length of command
+  buffer[3] = 'R';
+  buffer[4] = 'E';
+  buffer[5] = 'A';
+  buffer[6] = 'D';
+  buffer[7] = 'Y';
+  // property
+  buffer[8] = 11;
+  buffer[9] = 'S';
+  buffer[10] = 'o';
+  buffer[11] = 'c';
+  buffer[12] = 'k';
+  buffer[13] = 'e';
+  buffer[14] = 't';
+  buffer[15] = '-';
+  buffer[16] = 'T';
+  buffer[17] = 'y';
+  buffer[18] = 'p';
+  buffer[19] = 'e';
+  buffer[20] = 0;
+  buffer[21] = 0;
+  buffer[22] = 0;
   return len; // 0 len message
 }

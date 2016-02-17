@@ -10,8 +10,15 @@ include_directories("${PROJECT_INCLUDE_DIR}")
 
 ### add example executable directories
 add_avr_executable(zmq-monitoringServer-test zmq-monitoringServer-test/zmq-monitoringServer-test.cpp)
+add_avr_executable(uiptest uiptest/uiptest.cpp)
 
 ### add the dependant libraries
-### acm7812_test
-avr_target_link_libraries(zmq-monitoringServer-test AMC7812)
+### zmq monitoring server
+avr_target_link_libraries(zmq-monitoringServer-test ARDUINO)
+#avr_target_link_libraries(zmq-monitoringServer-test AMC7812)
+avr_target_link_libraries(zmq-monitoringServer-test UIPETHERNET)
 avr_target_link_libraries(zmq-monitoringServer-test ZMQ)
+# uipTest
+avr_target_link_libraries(uiptest AMC7812)
+avr_target_link_libraries(uiptest ARDUINO)
+avr_target_link_libraries(uiptest UIPETHERNET)

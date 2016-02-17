@@ -1,6 +1,9 @@
+#ifndef MONSERVER
+#define MONSERVER
+
 #include <stdint.h>
 
-#define CHANNEL_NAME_SIZE 2 // len('xx') = 2
+#define CHANNEL_NAME_SIZE 3 // len('cxx') = 3
 #define INT_TYPE_SIZE 3     // len('int') = 3
 #define TIMESTAMP_SIZE 10   // 2^32 = 4E10
 
@@ -34,16 +37,15 @@ class DataPacket{
     uint8_t preparePacket( uint32_t timestamp, int16_t* data );
 
   private:
+    const uint8_t channels; // number of data points to send
+    char * const streamName;  // stream designator with extra common json stuff
+    const uint8_t streamNameSize;     // length of stream name
+    const uint8_t dataEntrySize;  // size of each entry (max int to decimal places)
+    char * const buffer;  // pointer to start of buffer (4 bytes after start of zmq buffer)
+
     // packet size
     uint8_t registerSize;   // regsiter stream packet size in bytes
     uint8_t packetSize;     // data packet size in bytes
-    const uint8_t dataEntrySize;  // size of each entry (max int to decimal places)
-    const uint8_t channels; // number of data points to send
-
-    const uint8_t streamNameSize;     // length of stream name
-    char * const streamName;  // stream designator with extra common json stuff
-
-    char * const buffer;  // pointer to start of buffer (4 bytes after start of zmq buffer)
 
     // convert from int16 to char array with space padding
     // pass pointer to the location in the buffer where data starts and fill it
@@ -59,3 +61,5 @@ class DataPacket{
 
     void addChannelData( uint8_t ch, int16_t x, char* buf );
 };
+
+#endif

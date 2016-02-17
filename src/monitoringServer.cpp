@@ -20,6 +20,7 @@ uint8_t DataPacket::registerStream(){
   }
   buffer[registerSize-2] = '}';
   buffer[registerSize-1] = ']';
+  return registerSize;
 }
 
 // ready the data packet in the buffer
@@ -34,6 +35,7 @@ uint8_t DataPacket::preparePacket( uint32_t timestamp, int16_t* data ){
   }
   buffer[packetSize-2] = '}';
   buffer[packetSize-1] = ']';
+  return packetSize;
 }
 
 // convert from int16 to char array with space padding
@@ -64,15 +66,17 @@ uint8_t DataPacket::addChannelStr( uint8_t ch, char* buf ){
   if( ch < 10 ){
     buf[0] = ' ';
     buf[1] = '"';
-    buf[2] = '0'+ch;
+    buf[2] = 'c';
+    buf[3] = '0'+ch;
   } else {
     buf[0] = '"';
-    buf[1] = '1';
-    buf[2] = '0'+ch-10;
+    buf[1] = 'c';
+    buf[2] = '1';
+    buf[3] = '0'+ch-10;
   }
-  buf[3] = '"';
-  buf[4] = ':';
-  return 5;
+  buf[4] = '"';
+  buf[5] = ':';
+  return 6;
 }
 
 void DataPacket::registerChannel( uint8_t ch, char* buf ){

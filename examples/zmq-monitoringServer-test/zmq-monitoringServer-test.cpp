@@ -23,7 +23,10 @@ the uIP tcp stack by Adam Dunkels.
 #include "zmqduino.h"   // zmq interface
 #include "monitoringServer.h" // monitoringServer interface
 
+#define DHCP 1
+
 uint8_t channels = 2;
+uint8_t dataEntrySize = 5; // 16 bits ~> 65,000 -> 5 5 digits
 
 char zmq_buffer[90]={0}; //!< buffer for zmq communication
 
@@ -32,7 +35,7 @@ byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEE};
 // initialize the library instance:
 EthernetClient client;
 ZMQSocket ZMQPush(client, zmq_buffer, PUSH);
-DataPacket packet( channels, (char *)"cmon", 4, 5, zmq_buffer + ZMQ_MSG_OFFSET );
+DataPacket packet( channels, (char *)"cmon", 4, dataEntrySize, zmq_buffer + ZMQ_MSG_OFFSET );
 
 // fill in an available IP address on your network here,
 // for manual configuration:
@@ -60,20 +63,22 @@ void setup() {
   // set up ethernet chip
   delay(1000);
   byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEE};
-  /*
+#if DHCP || UIP_UDP
   Serial.println(F("DHCP..."));
   if (Ethernet.begin(mac) == 0) {
     Serial.println(F("Faled DHCP"));
     for(;;)
       ;
   }
-  */
+#else
   Serial.println(F("STATIC..."));
   Ethernet.begin(mac,ip);// cant use DHCP without using UDP
+#endif
+
   Serial.println(Ethernet.localIP());
-  //Serial.println(Ethernet.subnetMask());
-  //Serial.println(Ethernet.gatewayIP());
-  //Serial.println(Ethernet.dnsServerIP());
+  Serial.println(Ethernet.subnetMask());
+  Serial.println(Ethernet.gatewayIP());
+  Serial.println(Ethernet.dnsServerIP());
 
   // setup request socket
   Serial.println(F("Setting up REQ socket"));
@@ -88,7 +93,6 @@ void setup() {
       err = 1;
     }
     if(!err){
-      //Ethernet.maintain();
       // register datastream with server
       Serial.println(F("Registering data stream..."));
       len = packet.registerStream();
@@ -122,12 +126,12 @@ void setup() {
       ;
   }
   Serial.println(F("Starting"));
-  delay(3000);
   Serial.println(F("Data"));
+  Serial.println(F("Stream"));
+  delay(3000);
 }
 
 void loop() {
-  Serial.println(F("Stream"));
   Ethernet.maintain();
 
   // if timer has rolled over send data
@@ -135,10 +139,7 @@ void loop() {
     uint32_t ts = millis();
     next = ts + postingInterval;
 
-    Serial.println(F("For"));
-
     uint8_t len = packet.preparePacket( ts, counts );
-    Serial.println(F("Reals"));
     Serial.write((uint8_t*)(zmq_buffer+ZMQ_MSG_OFFSET),len);
     Serial.println();
     ZMQPush.sendZMQMsg(len);
@@ -151,6 +152,12 @@ void loop() {
     len = ZMQPush.read(); // process header and get get actual mesg length
   }
   counts[0]++;
+  if( counts[0] < 0 ){
+    counts[0] &= 0x7fff;
+  }
+  if( counts[1] < 0 ){
+    counts[1] &= 0x7fff;
+  }
 }
 
 // normal arduino main function

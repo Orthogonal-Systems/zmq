@@ -64,9 +64,9 @@ int8_t ZMQSocket::connect( IPAddress host, uint16_t port ){
       delay(1000);
     }
 
-    Serial.println(F("preconnect"));
+    //Serial.println(F("preconnect"));
     err = client.connect(host, port);
-    Serial.println(F("postconnect"));
+    //Serial.println(F("postconnect"));
     // client. connect returns negative error number, success is 1
     if( err > 0 ){
 #ifdef DEBUG

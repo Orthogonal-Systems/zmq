@@ -5,6 +5,7 @@
 
 #define CHANNEL_NAME_SIZE 3 // len('cxx') = 3
 #define INT_TYPE_SIZE 3     // len('int') = 3
+#define FLOAT_TYPE_SIZE 5     // len('int') = 3
 #define TIMESTAMP_SIZE 10   // 2^32 = 4E10
 
 class DataPacket{
@@ -22,8 +23,10 @@ class DataPacket{
       , dataEntrySize(_entrySize)
       , buffer(_buffer)
       {
+        // TODO: find better way
         // calculate regstration packet size
-        registerSize = 6 + streamNameSize + channels*( 6 + CHANNEL_NAME_SIZE + INT_TYPE_SIZE );
+        //registerSize = 6 + streamNameSize + channels*( 6 + CHANNEL_NAME_SIZE + INT_TYPE_SIZE );
+        registerSize = 6 + streamNameSize + channels*( 6 + CHANNEL_NAME_SIZE + FLOAT_TYPE_SIZE );
         // calculate data packet size
         packetSize = 7 + streamNameSize + TIMESTAMP_SIZE + channels*( 4 + CHANNEL_NAME_SIZE + dataEntrySize );
       }
@@ -31,10 +34,12 @@ class DataPacket{
     // ready special packet in the buffer to send to sever to announce the data format
     // then call send function to send it
     // returns length of packet in bytes
-    uint8_t registerStream();
+    uint8_t registerIntStream();
+    uint8_t registerFloatStream();
     // ready the data packet in the buffer
     // returns length of packet in bytes
     uint8_t preparePacket( uint32_t timestamp, int16_t* data );
+    uint8_t preparePacket( uint32_t timestamp, float* data );
 
   private:
     const uint8_t channels; // number of data points to send
@@ -57,9 +62,10 @@ class DataPacket{
 
     // add the channel register sequence to the buffer
     // pass pointer to the location in the buffer where data starts and fill it
-    void registerChannel( uint8_t ch, char* buf );
+    void registerChannel( uint8_t ch, char* buf, uint8_t type );
 
     void addChannelData( uint8_t ch, int16_t x, char* buf );
+    void addChannelData( uint8_t ch, float x, char* buf );
 };
 
 #endif

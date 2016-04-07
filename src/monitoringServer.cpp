@@ -17,7 +17,7 @@ uint8_t DataPacket::registerIntStream(){
   uint8_t os = addPreString();
   buffer[os] = '{';
   if( fracSecTS ){
-    os += regFracSecTS( buffer+1 );
+    os += regFracSecTS( buffer+os+1 );
   }
   for( uint8_t i=0; i<channels; i++ ){
     registerChannel(i,buffer+os+1+i*(6+CHANNEL_NAME_SIZE+INT_TYPE_SIZE),1);
@@ -33,7 +33,7 @@ uint8_t DataPacket::registerFloatStream(){
   uint8_t os = addPreString();
   buffer[os] = '{';
   if( fracSecTS ){
-    os += regFracSecTS( buffer+1 );
+    os += regFracSecTS( buffer+os+1 );
   }
   for( uint8_t i=0; i<channels; i++ ){
     registerChannel(i,buffer+os+1+i*(6+CHANNEL_NAME_SIZE+FLOAT_TYPE_SIZE),2);
@@ -55,7 +55,7 @@ uint8_t DataPacket::preparePacket( uint32_t timestamp, uint32_t fsTS, int16_t* d
   buffer[os+TIMESTAMP_SIZE] = ',';
   buffer[os+TIMESTAMP_SIZE+1] = '{';
   if( fracSecTS ){
-    os += addFracSecTS(buffer+2, fsTS);
+    os += addFracSecTS(buffer+os+TIMESTAMP_SIZE+2, fsTS);
   }
   for( uint8_t i=0; i<channels; i++ ){
     addChannelData( i, data[i], buffer+os+TIMESTAMP_SIZE+2+i*(4+CHANNEL_NAME_SIZE+dataEntrySize) );
@@ -75,7 +75,7 @@ uint8_t DataPacket::preparePacket( uint32_t timestamp, uint32_t fsTS, float* dat
   buffer[os+TIMESTAMP_SIZE] = ',';
   buffer[os+TIMESTAMP_SIZE+1] = '{';
   if( fracSecTS ){
-    os += addFracSecTS(buffer+2, fsTS);
+    os += addFracSecTS(buffer+os+TIMESTAMP_SIZE+2, fsTS);
   }
   for( uint8_t i=0; i<channels; i++ ){
     addChannelData( i, data[i], buffer+os+TIMESTAMP_SIZE+2+i*(4+CHANNEL_NAME_SIZE+dataEntrySize) );
@@ -176,7 +176,7 @@ uint8_t DataPacket::regFracSecTS( char* buf ){
   buf[2] = 't';
   buf[3] = 's';
   buf[4] = '"';
-  buf[5] = ',';
+  buf[5] = ':';
   buf[6] = '"';
   buf[7] = 'i';
   buf[8] = 'n';
@@ -192,7 +192,7 @@ uint8_t DataPacket::addFracSecTS( char* buf, uint32_t fsTS){
   buf[2] = 't';
   buf[3] = 's';
   buf[4] = '"';
-  buf[5] = ',';
+  buf[5] = ':';
   buf[6] = '"';
   int2charArray( fsTS, buf + 7);
   buf[TIMESTAMP_SIZE + 7] = '"';

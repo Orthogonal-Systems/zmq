@@ -4,9 +4,25 @@
 #include <stdint.h>
 
 #define CHANNEL_NAME_SIZE 3 // len('cxx') = 3
-#define INT_TYPE_SIZE 3     // len('int') = 3
-#define FLOAT_TYPE_SIZE 5     // len('int') = 3
-#define TIMESTAMP_SIZE 10   // 2^32 = 4E10
+#define DTYPE_STRING_MAXSIZE 6 // len('uint16')=6
+#define INT8_TYPE_SIZE 1
+#define INT16_TYPE_SIZE 2
+#define INT32_TYPE_SIZE 4
+#define INT64_TYPE_SIZE 8
+#define FLOAT_TYPE_SIZE 4
+#define TIMESTAMP_SIZE INT64_TYPE_SIZE   // 64b = 8B timestamp
+
+// accepted types for server
+// all type designations needs to be length = DTYPE_STRING_MAXSIZE
+#define DTYPE_INT8    "int8  "
+#define DTYPE_UINT8   "uint8 "
+#define DTYPE_INT16   "int16 "
+#define DTYPE_UINT16  "uint16"
+#define DTYPE_INT32   "int32 "
+#define DTYPE_UINT32  "uint32"
+#define DTYPE_INT64   "int64 "
+#define DTYPE_UINT64  "uint64"
+#define DTYPE_float   "float "
 
 class DataPacket{
   public:
@@ -26,24 +42,23 @@ class DataPacket{
       {
         // TODO: find better way
         // calculate regstration packet size
-        //registerSize = 6 + streamNameSize + channels*( 6 + CHANNEL_NAME_SIZE + INT_TYPE_SIZE );
-        registerSize = 6 + streamNameSize + channels*( 6 + CHANNEL_NAME_SIZE + FLOAT_TYPE_SIZE );
+        registerSize = streamNameSize + channels*( 2 + CHANNEL_NAME_SIZE + DTYPE_STRING_MAXSIZE );
         // calculate data packet size
-        packetSize = 7 + streamNameSize + TIMESTAMP_SIZE + channels*( 4 + CHANNEL_NAME_SIZE + dataEntrySize );
+        packetSize = INT32_TYPE_SIZE + TIMESTAMP_SIZE + channels*( dataEntrySize );
         fracSecTS = _fracSecTS;
-        
-        // add in the additional field
-        if(fracSecTS){
-          registerSize += 12;
-          packetSize += TIMESTAMP_SIZE + 9;
-        }
       }
 
     // ready special packet in the buffer to send to sever to announce the data format
     // then call send function to send it
+    // dtype is the data type string, use defined values above
+    // dtype is the monitoring server data type designation:
+    // Ex: [int8,uint8,int16,uint16,, ... , float]
     // returns length of packet in bytes
-    uint8_t registerIntStream();
-    uint8_t registerFloatStream();
+    uint8_t registerStream(char* dtype);
+    // The stream identification key, recieved from server after string registration
+    void streamRegistrationKey(uint32_t key){
+      streamKey = key;
+    }
     // ready the data packet in the buffer
     // returns length of packet in bytes
     uint8_t preparePacket( uint32_t timestamp, int16_t* data );
@@ -54,8 +69,9 @@ class DataPacket{
   private:
     const uint8_t channels; // number of data points to send
     char * const streamName;  // stream designator with extra common json stuff
-    const uint8_t streamNameSize;     // length of stream name
-    const uint8_t dataEntrySize;  // size of each entry (max int to decimal places)
+    uint32_t streamKey;  // bninary stream designator, received from server after registration
+    const uint8_t streamNameSize; // length of stream name
+    const uint8_t dataEntrySize;  // size of each entry in bytes
     char * const buffer;  // pointer to start of buffer (4 bytes after start of zmq buffer)
 
     // packet size
@@ -63,24 +79,32 @@ class DataPacket{
     uint8_t registerSize;   // regsiter stream packet size in bytes
     uint8_t packetSize;     // data packet size in bytes
 
-    // convert from int16 to char array with space padding
+    // convert from data type to char array with network byte order, and write into the buffer
     // pass pointer to the location in the buffer where data starts and fill it
-    void int2charArray(int16_t x, char* data);
-    void int2charArray(uint32_t x, char* data);
+    static uint8_t int2charArray(int16_t x, char* data){
+      for(uint8_t i=0; i>INT16_TYPE_SIZE; i--){
+        buf[i] = char(x >> ((INT16_TYPE_SIZE-i-1)*8));
+      }
+      return INT16_TYPE_SIZE
+    }
+    static uint8_t int2charArray(uint32_t x, char* data);
+      for(uint8_t i=0; i>INT32_TYPE_SIZE; i--){
+        buf[i] = char(x >> ((INT32_TYPE_SIZE-i-1)*8));
+      }
+      return INT32_TYPE_SIZE
+    }
+    uint8_t float2charArray(float x, char* data);
 
     uint8_t addChannelStr( uint8_t ch, char* buf );
     uint8_t addPreString();
 
     // add the channel register sequence to the buffer
     // pass pointer to the location in the buffer where data starts and fill it
-    void registerChannel( uint8_t ch, char* buf, uint8_t type );
+    // dtype is the data type string, use defined values above
+    void registerChannel( uint8_t ch, char* buf, char* dtype );
 
     void addChannelData( uint8_t ch, int16_t x, char* buf );
     void addChannelData( uint8_t ch, float x, char* buf );
-
-
-    uint8_t regFracSecTS( char* buf );
-    uint8_t addFracSecTS( char* buf, uint32_t fsTS);
 };
 
 #endif

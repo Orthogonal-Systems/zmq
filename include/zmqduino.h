@@ -47,17 +47,22 @@ class ZMQSocket {
       , socketType(_socketType)
     {}
 
-    // zmq negotiate connection
+    //! zmq negotiate connection
     int8_t connect( IPAddress host, uint16_t port );
 
-    // send data to server (msg is already formatted and stored in zmq_buffer)
+    //! send data to server (msg is already formatted and stored in zmq_buffer)
     void send( uint8_t len );
 
-    // send data to server, no formatting done
+    //! send data to server, no formatting done
     void send( const char* msg, uint8_t len );
 
-    // format header and send a ZMQ message that is already stored in the buffer
+    //! format header and send a ZMQ message that is already stored in the buffer
     void sendZMQMsg( uint8_t msgLen );
+
+    //! stop the ethernet client
+    void stop(){
+      client.stop();
+    }
     
     int16_t read();
     int16_t recv();

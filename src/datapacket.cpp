@@ -1,4 +1,4 @@
-#include "monitoringServer.h"
+#include "datapacket.h"
 #include <Arduino.h>
 #include <stdlib.h>
 
@@ -12,14 +12,33 @@ uint8_t DataPacket::registerStream(char* dtype){
   return registerSize;
 }
 
-// ready the data packet in the buffer
+// read the message in the buffer of length len
+// extract streamKey and return 0 if success, else return error code
+uint8_t DataPacket::processStreamRegistration(uint8_t len){
+  // the server response should be in the format of '[errorcode,streamKey]', where stream key is a uint32
+  // that is used to identify the stream with the server.
+  // error code is a char, 0 is no error
+  if( buffer[1] != '0' ){
+    return ERR_SERVER_RESP;
+  } 
+  if( len != 8 ){
+    return ERR_SERVER_LEN;
+  }
+  streamRegistrationKey( buffer+3 );// store stream identifier
+  return 0;
+}
+
+// ready the data packet in the buffer with no fractional second info
 // returns length of packet in bytes
 uint8_t DataPacket::preparePacket( uint32_t timestamp, int16_t* data ){
   return preparePacket( timestamp, 0, data);
 }
 
+// ready the data packet in the buffer with fractional second info
+// returns length of packet in bytes
 uint8_t DataPacket::preparePacket( uint32_t timestamp, uint32_t fsTS, int16_t* data ){
-  uint8_t os = int2charArray(streamKey, buffer);
+  memcpy(buffer, streamKey, STREAM_KEY_LENGTH);
+  uint8_t os = STREAM_KEY_LENGTH;
   os += int2charArray(timestamp, buffer+os);
   os += int2charArray(fsTS, buffer+os); // add in second set of 4 bytes
   for( uint8_t i=0; i<channels; i++ ){
@@ -33,7 +52,8 @@ uint8_t DataPacket::preparePacket( uint32_t timestamp, float* data ){
 }
 
 uint8_t DataPacket::preparePacket( uint32_t timestamp, uint32_t fsTS, float* data ){
-  uint8_t os = int2charArray(streamKey, buffer);
+  memcpy(buffer, streamKey, STREAM_KEY_LENGTH);
+  uint8_t os = STREAM_KEY_LENGTH;
   os += int2charArray(timestamp, buffer+os);
   os += int2charArray(fsTS, buffer+os); // add in second set of 4 bytes
   for( uint8_t i=0; i<channels; i++ ){

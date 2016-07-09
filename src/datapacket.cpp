@@ -1,5 +1,5 @@
 #include "datapacket.h"
-#include <Arduino.h>
+//#include <Arduino.h>
 #include <stdlib.h>
 
 // ready special packet in the buffer to send to sever to announce the data format
@@ -66,17 +66,15 @@ uint8_t DataPacket::addChannelStr( uint8_t ch, char* buf ){
   buf[0] = ',';
   if( ch < 10 ){
     buf[1] = ' ';
-    buf[2] = '"';
-    buf[3] = 'c';
-    buf[4] = '0'+ch;
-  } else {
-    buf[1] = '"';
     buf[2] = 'c';
-    buf[3] = '1';
-    buf[4] = '0'+ch-10;
+    buf[3] = '0'+ch;
+  } else {
+    buf[1] = 'c';
+    buf[2] = '1';
+    buf[3] = '0'+ch-10;
   }
-  buf[5] = ':';
-  return 6;
+  buf[4] = ':';
+  return 5;
 }
 
 uint8_t DataPacket::addPreString(){

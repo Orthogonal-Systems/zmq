@@ -70,6 +70,14 @@ class DataPacket{
     uint8_t preparePacket( uint32_t timestamp, float* data );
     uint8_t preparePacket( uint32_t timestamp, uint32_t fsTS, float* data );
 
+    uint8_t getRegisterSize(){
+      return registerSize;
+    }
+    uint8_t getPacketSize(){
+      return packetSize;
+    }
+
+
   private:
     const uint8_t channels; //! number of data points to send
     char * const streamName;  //! human readable stream designator

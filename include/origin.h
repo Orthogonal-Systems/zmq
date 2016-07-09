@@ -31,7 +31,6 @@ class Origin{
       , ZMQPush(_client, _zmq_buffer, PUSH)
       , packet(_channels, _stream_name, _stream_name_length, _dtype_size, _zmq_buffer+4, _fracSecTS)
       , ZMQbuffer(_zmq_buffer) 
-      , MSGbuffer(_zmq_buffer+4) 
     {
       server_ip = _server_ip;
       reg_port = _reg_port;
@@ -68,7 +67,6 @@ class Origin{
     DataPacket packet;        //! data packet class
     char * dtype_str[DTYPE_STRING_MAXSIZE];
     char * const ZMQbuffer;   //! pointer to start of buffer
-    char * const MSGbuffer;   //! pointer to start of buffer after ZMQ header
 };
 
 #endif

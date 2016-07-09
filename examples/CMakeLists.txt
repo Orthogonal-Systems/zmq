@@ -14,6 +14,6 @@ add_avr_executable(zmq-monitoringServer-test zmq-monitoringServer-test/zmq-monit
 ### add the dependant libraries
 ### zmq monitoring server
 avr_target_link_libraries(zmq-monitoringServer-test ARDUINO)
-#avr_target_link_libraries(zmq-monitoringServer-test AMC7812)
 avr_target_link_libraries(zmq-monitoringServer-test UIPETHERNET)
 avr_target_link_libraries(zmq-monitoringServer-test ZMQ)
+avr_target_link_libraries(zmq-monitoringServer-test TIME)
